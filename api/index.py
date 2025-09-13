@@ -1,22 +1,62 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Depends, status
+from pydantic import BaseModel
+from typing import Annotated
+from . import models
+from .database import engine, SessionLocal
+from sqlalchemy.orm import Session
 
-ENGINEER_ROLES = [
-    {'title': 'Frontend Developer', 'mainskill': 'React'},
-    {'title': 'Backend Developer', 'mainskill': 'Node.js'},
-    {'title': 'Fullstack Developer', 'mainskill': 'Next.js'},
-    {'title': 'Machine Learning Engineer', 'mainskill': 'Tensorflow'},
-    {'title': 'Data Scientist', 'mainskill': 'Apache Spark'},
-    {'title': 'Software Architect', 'mainskill': 'System Analysis'},
-]
-
-# Create FastAPI instance with custom docs
 app = FastAPI()
 
+models.Base.metadata.create_all(bind=engine)
 
-@app.get("/api/engineer-roles")
-async def read_category_by_query(title: str):
-    role_to_return = None
-    for role in ENGINEER_ROLES:
-        if role.get('title').casefold() == title.casefold():
-            role_to_return = role
-    return role_to_return
+class PostBase(BaseModel):
+    title: str
+    content: str
+    user_id: int
+
+class UserBase(BaseModel):
+    username: str
+    fullname:str
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+db_dependency = Annotated[Session, Depends(get_db)]
+
+@app.post("/api/posts", status_code=status.HTTP_201_CREATED)
+async def create_post(post: PostBase, db: db_dependency):
+    db_post = models.Post(**post.dict())
+    db.add(db_post)
+    db.commit()
+
+@app.get("/api/posts/{post_id}", status_code=status.HTTP_200_OK)
+async def read_post(post_id: int, db: db_dependency):
+    post = db.query(models.Post).filter(models.Post.id == post_id).first()
+    if post is None:
+        raise HTTPException(status_code=404, detail='Post not found')
+    return post
+
+@app.delete("/api/posts/{post_id}", status_code=status.HTTP_200_OK)
+async def delete_post(post_id: int, db: db_dependency):
+    db_post = db.query(models.Post).filter(models.Post.id == post_id).first()
+    if db_post is None:
+        raise HTTPException(status_code=404, detail='Post was not found')
+    db.delete(db_post)
+    db.commit()
+
+@app.post("/api/users", status_code=status.HTTP_201_CREATED)
+async def create_user(user: UserBase, db: db_dependency):
+    db_user = models.User(**user.dict())
+    db.add(db_user)
+    db.commit()
+
+@app.get("/api/users/{user_id}", status_code=status.HTTP_200_OK)
+async def read_user(user_id: int, db: db_dependency):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail='User not found')
+    return user

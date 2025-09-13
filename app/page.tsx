@@ -1,23 +1,25 @@
 
 
 export default async function Home() {
-  const role = await fetchEngineerRole({ title: 'Frontend Developer' });
+  const post = await fetchPost({ postID: 1 });
 
   return (
     <>
-      <div>{`The main skill of a ${role.title} is ${role.mainskill}.`}</div>
+      <div>
+        <div>Title: {post.title}</div>
+        <div>Content: {post.content}</div>
+      </div>
     </>
   );
 }
 
-async function fetchEngineerRole({ title }: { title: string }) {
+async function fetchPost({ postID }: { postID: number }) {
  
-  const baseUrl = "http://localhost:3000";
+  const baseUrl = process.env.APP_URL;
 
   try {
-    const response = await fetch(
-      `${baseUrl}/api/engineer-roles?title=${title}`
-    );
+    const response = await fetch(`${baseUrl}/api/posts/${postID}`);
+    
     if (!response.ok) {
       throw new Error("Failed to fetch data");
     }
